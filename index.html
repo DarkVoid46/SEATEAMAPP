@@ -24,6 +24,8 @@ button.primary{width:100%;border:0;background:var(--blue);color:#fff;padding:13p
 footer{position:fixed;bottom:0;max-width:430px;width:100%;padding:10px 16px;background:#fff;border-top:1px solid var(--line)}footer button{background:var(--yellow);color:#172d43}
 .toast{position:fixed;left:50%;bottom:75px;transform:translateX(-50%);background:#16324f;color:#fff;padding:10px 15px;border-radius:20px;display:none;font-size:13px}
 .money-input{display:flex;align-items:center;justify-content:flex-end;gap:4px}.money-input span{font-size:18px}.money-input input{width:120px!important}.money-input input::placeholder{opacity:.6}.scanner-box{display:none;margin:12px 0;position:relative}.scanner-box video{width:100%;border-radius:12px;background:#000;max-height:320px;display:block}.scanner-view{position:relative;overflow:hidden;border-radius:12px}.scan-guide{position:absolute;left:5%;right:5%;top:50%;height:3px;background:#ff2d2d;transform:translateY(-50%);box-shadow:0 0 8px rgba(255,45,45,.85);z-index:3;pointer-events:none}.scanner-actions{display:flex;gap:8px;margin-top:8px}.scanner-status{font-size:12px;color:var(--muted);margin:7px 0}
+
+.auth-overlay{position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 20% 0%,#102d49 0,#06111e 42%,#02070d 100%);display:flex;align-items:center;justify-content:center;padding:24px}.auth-card{width:min(390px,100%);padding:26px;border:1px solid rgba(99,230,255,.28);border-radius:20px;background:rgba(7,24,39,.94);box-shadow:0 20px 70px #0008}.auth-card h2{margin:0 0 8px;color:#fff}.auth-card p{color:#8aa8bb;font-size:13px}.auth-error{min-height:20px;color:#ff8c95;font-size:12px;margin:4px 0 8px}.auth-hidden{display:none!important}.signout-btn{position:absolute;right:18px;top:18px;width:auto!important;padding:7px 10px!important;font-size:11px!important;z-index:5}header{position:relative}
 </style>
 
 <style id="futuristic-redesign">
@@ -65,10 +67,13 @@ tr:hover td{background:rgba(99,230,255,.035)!important}
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SEA Team">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+<div id="authOverlay" class="auth-overlay"><div class="auth-card"><div class="brand">Seattle Team</div><h2>Team Sign In</h2><p>Sign in with an authorized Seattle Team account.</p><input id="loginEmail" type="email" autocomplete="username" placeholder="Email"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password"><div id="authError" class="auth-error"></div><button id="loginButton" class="primary" type="button">Sign In</button></div></div>
+
 <div class="app">
-<header><div class="brand">Seattle Team</div><div class="title">End of Day</div><div class="date" id="headerDate"></div></header>
+<header><button id="signOutButton" class="signout-btn" type="button">Sign Out</button><div class="brand">Seattle Team</div><div class="title">End of Day</div><div class="date" id="headerDate"></div></header>
 <nav>
 <button class="active" onclick="show('dashboard',this)">Daily Operations</button><button onclick="show('employees',this)">Employees</button><button onclick="show('codes',this)">Codes</button><button onclick="show('tracking',this)">Tracking</button><button onclick="show('calendar',this)">Calendar</button>
 </nav>
@@ -130,7 +135,7 @@ if(!state.floaterName) state.floaterName='';
 if(!state.codeSuffix || !['1','2','3','4'].includes(String(state.codeSuffix))) state.codeSuffix='1';
 state.tracking=[]; // legacy tracking history disabled; only the current report tracking number is retained
 document.getElementById('headerDate').textContent=today.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-function persist(){localStorage.setItem('eodState',JSON.stringify(state));render()}
+function persist(){localStorage.setItem('eodState',JSON.stringify(state));render();scheduleCloudSave()}
 function show(id,btn){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');}
 function render(){
 document.getElementById('sheetDate').textContent=today.toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'});const td=state.daily||{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''};document.getElementById('totalParticipantsTop').value=td.participants||'';document.getElementById('dailyNpsTop').value=td.nps||'';document.getElementById('monthlyNpsTop').value=td.monthlyNps||'';document.getElementById('dailyPatTop').value=td.pat?Number(td.pat).toFixed(2):'';document.getElementById('monthlyPatTop').value=td.monthlyPat?Number(td.monthlyPat).toFixed(2):'';document.getElementById('dailyUpsellTop').value=td.upsell||'';document.getElementById('trackingCountTop').value=td.trackingNumbers||'';const checkedEmployees=employees.filter(n=>!!state.employees[n]).length;document.getElementById('employeesPresentTop').value=checkedEmployees?`${checkedEmployees}/${employees.length}`:'';document.getElementById('filledByTop').value=td.filledBy||'';document.getElementById('employeesList').innerHTML=employees.map(n=>n==='Floater'?`<div class="row"><div style="flex:1;padding-right:12px"><span class="mini" style="display:block;margin:0 0 3px">Floater</span><input id="floaterNameInput" type="text" value="${escapeHtml(state.floaterName||'')}" placeholder="Type floater name" style="margin:0" oninput="updateFloaterName(this.value)"></div><div class="toggle ${state.employees[n]?'on':''}" onclick="toggleEmp('Floater')"><i></i></div></div>`:`<div class="row"><span class="name">${n}</span><div class="toggle ${state.employees[n]?'on':''}" onclick="toggleEmp('${n}')"><i></i></div></div>`).join('');
@@ -143,7 +148,7 @@ function updateFloaterName(v){state.floaterName=v;localStorage.setItem('eodState
 function toggleEmp(n){state.employees[n]=!state.employees[n];state.daily=state.daily||{};state.daily.employeesPresent=employees.filter(name=>!!state.employees[name]).length;persist();autoSaveCurrentReport()}
 function generateScreeningCodePrefix(){const d=new Date(state.date+'T00:00:00');const yy=String(d.getFullYear()).slice(-2);const mm=String(d.getMonth()+1).padStart(2,'0');const dd=String(d.getDate()).padStart(2,'0');return `${yy}-${mm}${dd}_SEA,`}
 function generateScreeningCode(){return generateScreeningCodePrefix()+String(state.codeSuffix||'1')}
-function updateCodeSuffix(v){if(!['1','2','3','4'].includes(String(v)))return;state.codeSuffix=String(v);localStorage.setItem('eodState',JSON.stringify(state));const code=generateScreeningCode();const ci=document.getElementById('codeInput');if(ci)ci.value=code;const cell=document.getElementById('codeStatusCell');if(cell)cell.textContent=code}
+function updateCodeSuffix(v){if(!['1','2','3','4'].includes(String(v)))return;state.codeSuffix=String(v);localStorage.setItem('eodState',JSON.stringify(state));scheduleCloudSave();const code=generateScreeningCode();const ci=document.getElementById('codeInput');if(ci)ci.value=code;const cell=document.getElementById('codeStatusCell');if(cell)cell.textContent=code}
 function addTracking(){let x=document.getElementById('trackingInput').value.trim();if(x){document.getElementById('trackingCountTop').value=x;state.daily=state.daily||{};state.daily.trackingNumbers=x;document.getElementById('trackingInput').value='';persist();toast('Tracking number added ✓')}}
 let scannerStream=null,scannerTimer=null,barcodeDetector=null;
 async function scanLabel(){
@@ -213,8 +218,32 @@ function autoSaveCurrentReport(){
   state.saved[state.date]={employees:state.employees,floaterName:state.floaterName||'',screeningCode:generateScreeningCode(),tracking:state.daily.trackingNumbers,employeesPresent:state.daily.employeesPresent,participants:state.daily.participants,nps:state.daily.nps,monthlyNps:state.daily.monthlyNps,pat:state.daily.pat,monthlyPat:state.daily.monthlyPat,upsell:state.daily.upsell,filledBy:state.daily.filledBy};
   localStorage.setItem('eodState',JSON.stringify(state));
   calendar();
+  scheduleCloudSave();
 }
 ['totalParticipantsTop','dailyNpsTop','monthlyNpsTop','monthlyPatTop','dailyUpsellTop','trackingCountTop','filledByTop'].forEach(id=>document.getElementById(id)?.addEventListener('input',autoSaveCurrentReport));
+
+
+const SUPABASE_URL='https://kolziyigurwnbvpxqdgf.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_iAoXi9ylbbcSLRiDAwYw8Q_Mfb1YK76';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+let cloudReady=false, cloudTimer=null, realtimeChannel=null, applyingRemote=false;
+function blankToNull(v){return v===''||v===undefined?null:v}
+function cloudPayload(){
+  const d=state.daily||{};
+  return {report_date:state.date,participants:blankToNull(d.participants),daily_nps:blankToNull(d.nps),monthly_nps:blankToNull(d.monthlyNps),daily_pat:blankToNull(d.pat),monthly_pat:blankToNull(d.monthlyPat),upsell:blankToNull(d.upsell),screening_code:generateScreeningCode(),tracking_number:(d.trackingNumbers||'')||null,marina_present:!!state.employees.Marina,taylor_present:!!state.employees.Taylor,mia_present:!!state.employees.Mia,victor_present:!!state.employees.Victor,floater_present:!!state.employees.Floater,floater_name:state.floaterName||null,filled_by:d.filledBy||null};
+}
+function scheduleCloudSave(){if(!cloudReady||applyingRemote)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(saveCloud,450)}
+async function saveCloud(){if(!cloudReady||applyingRemote)return;const {error}=await sb.from('daily_reports').upsert(cloudPayload(),{onConflict:'report_date'});if(error)toast('Cloud save failed');}
+function applyCloudRow(r){if(!r)return;applyingRemote=true;state.date=r.report_date;state.daily={participants:r.participants??'',nps:r.daily_nps??'',monthlyNps:r.monthly_nps??'',pat:r.daily_pat??'',monthlyPat:r.monthly_pat??'',upsell:r.upsell??'',trackingNumbers:r.tracking_number??'',employeesPresent:0,filledBy:r.filled_by??''};state.employees={Marina:!!r.marina_present,Taylor:!!r.taylor_present,Mia:!!r.mia_present,Victor:!!r.victor_present,Floater:!!r.floater_present};state.daily.employeesPresent=employees.filter(n=>!!state.employees[n]).length;state.floaterName=r.floater_name||'';const m=String(r.screening_code||'').match(/,([1-4])$/);state.codeSuffix=m?m[1]:'1';localStorage.setItem('eodState',JSON.stringify(state));render();calculateDailyPAT();applyingRemote=false;}
+async function loadCloudDay(){const {data,error}=await sb.from('daily_reports').select('*').eq('report_date',state.date).maybeSingle();if(error){toast('Could not load cloud report');return}if(data)applyCloudRow(data);else await saveCloud();}
+function subscribeRealtime(){if(realtimeChannel)sb.removeChannel(realtimeChannel);realtimeChannel=sb.channel('daily-report-'+state.date).on('postgres_changes',{event:'*',schema:'public',table:'daily_reports',filter:'report_date=eq.'+state.date},payload=>{if(payload.new)applyCloudRow(payload.new)}).subscribe();}
+async function enterApp(){document.getElementById('authOverlay').classList.add('auth-hidden');cloudReady=true;await loadCloudDay();subscribeRealtime();}
+async function checkSession(){const {data}=await sb.auth.getSession();if(data.session)enterApp();}
+document.getElementById('loginButton').addEventListener('click',async()=>{const btn=document.getElementById('loginButton'),err=document.getElementById('authError');err.textContent='';btn.disabled=true;btn.textContent='Signing in…';const email=document.getElementById('loginEmail').value.trim(),password=document.getElementById('loginPassword').value;const {error}=await sb.auth.signInWithPassword({email,password});btn.disabled=false;btn.textContent='Sign In';if(error){err.textContent=error.message;return}enterApp();});
+document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginButton').click()});
+document.getElementById('signOutButton').addEventListener('click',async()=>{cloudReady=false;if(realtimeChannel)await sb.removeChannel(realtimeChannel);await sb.auth.signOut();document.getElementById('loginPassword').value='';document.getElementById('authOverlay').classList.remove('auth-hidden');});
+sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||!session){cloudReady=false;document.getElementById('authOverlay').classList.remove('auth-hidden')}});
+checkSession();
 
 render();calculateDailyPAT();
 </script>
