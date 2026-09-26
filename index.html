@@ -23,7 +23,7 @@ button.primary{width:100%;border:0;background:var(--blue);color:#fff;padding:13p
 .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.day{padding:9px 2px;text-align:center;border-radius:9px;font-size:12px;background:#f5f8fb}.day.has{background:#e9f3ff;color:var(--blue);font-weight:800}.day.today{outline:2px solid var(--blue)}
 footer{position:fixed;bottom:0;max-width:430px;width:100%;padding:10px 16px;background:#fff;border-top:1px solid var(--line)}footer button{background:var(--yellow);color:#172d43}
 .toast{position:fixed;left:50%;bottom:75px;transform:translateX(-50%);background:#16324f;color:#fff;padding:10px 15px;border-radius:20px;display:none;font-size:13px}
-.money-input{display:flex;align-items:center;justify-content:flex-end;gap:4px}.money-input span{font-size:18px}.money-input input{width:120px!important}.money-input input::placeholder{opacity:.6}.scanner-box{display:none;margin:12px 0;position:relative}.scanner-box video{width:100%;border-radius:12px;background:#000;max-height:320px;display:block}.scanner-view{position:relative;overflow:hidden;border-radius:12px}.scan-guide{position:absolute;left:5%;right:5%;top:50%;height:3px;background:#ff2d2d;transform:translateY(-50%);box-shadow:0 0 8px rgba(255,45,45,.85);z-index:3;pointer-events:none}.scanner-actions{display:flex;gap:8px;margin-top:8px}.scanner-status{font-size:12px;color:var(--muted);margin:7px 0}
+.money-input{display:flex;align-items:center;justify-content:flex-end;gap:4px}.money-input span{font-size:18px}.money-input input{width:120px!important}.money-input input::placeholder{opacity:.6}.scanner-box{display:none;margin:12px 0;position:relative}.scanner-box video{width:100%!important;border-radius:12px;background:#000;max-height:360px;display:block;object-fit:cover}.scanner-view{position:relative;overflow:hidden;border-radius:12px;background:#000}.scanner-view #scannerReader{width:100%;min-height:260px}.scanner-view #scannerReader video{width:100%!important;max-height:360px!important;object-fit:cover!important}.scan-guide{position:absolute;left:5%;right:5%;top:50%;height:3px;background:#ff2d2d;transform:translateY(-50%);box-shadow:0 0 8px rgba(255,45,45,.85);z-index:3;pointer-events:none}.scanner-actions{display:flex;gap:8px;margin-top:8px}.scanner-status{font-size:12px;color:var(--muted);margin:7px 0}
 
 .auth-overlay{position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 20% 0%,#102d49 0,#06111e 42%,#02070d 100%);display:flex;align-items:center;justify-content:center;padding:24px}.auth-card{width:min(390px,100%);padding:26px;border:1px solid rgba(99,230,255,.28);border-radius:20px;background:rgba(7,24,39,.94);box-shadow:0 20px 70px #0008}.auth-card h2{margin:0 0 8px;color:#fff}.auth-card p{color:#8aa8bb;font-size:13px}.auth-error{min-height:20px;color:#ff8c95;font-size:12px;margin:4px 0 8px}.auth-hidden{display:none!important}.signout-btn{position:absolute;right:18px;top:18px;width:auto!important;padding:7px 10px!important;font-size:11px!important;z-index:5}header{position:relative}
 </style>
@@ -68,6 +68,7 @@ tr:hover td{background:rgba(99,230,255,.035)!important}
 <meta name="apple-mobile-web-app-title" content="SEA Team">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 <div id="authOverlay" class="auth-overlay"><div class="auth-card"><div class="brand">Seattle Team</div><h2>Team Sign In</h2><p>Sign in with an authorized Seattle Team account.</p><input id="loginEmail" type="email" autocomplete="username" placeholder="Email"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password"><div id="authError" class="auth-error"></div><button id="loginButton" class="primary" type="button">Sign In</button></div></div>
@@ -109,7 +110,7 @@ tr:hover td{background:rgba(99,230,255,.035)!important}
 <section id="tracking" class="section">
 <div class="card"><h3>Tracking numbers</h3><p class="sub">Scan a shipping label or enter the number manually.</p>
 <button class="primary scan" onclick="scanLabel()">▣ Scan tracking label</button>
-<div id="scannerBox" class="scanner-box"><div class="scanner-view"><video id="scannerVideo" playsinline muted></video><div class="scan-guide" aria-hidden="true"></div></div><div id="scannerStatus" class="scanner-status">Point the camera at the barcode.</div><div class="scanner-actions"><button class="primary" type="button" onclick="stopScanner()">Cancel scanner</button></div></div>
+<div id="scannerBox" class="scanner-box"><div class="scanner-view"><div id="scannerReader"></div><div class="scan-guide" aria-hidden="true"></div></div><div id="scannerStatus" class="scanner-status">Point the camera at the barcode.</div><div class="scanner-actions"><button class="primary" type="button" onclick="stopScanner()">Cancel scanner</button></div></div>
 <input id="trackingInput" placeholder="Enter tracking number manually"><button class="primary" onclick="addTracking()">Add tracking number</button>
 </div>
 </section>
@@ -150,34 +151,75 @@ function generateScreeningCodePrefix(){const d=new Date(state.date+'T00:00:00');
 function generateScreeningCode(){return generateScreeningCodePrefix()+String(state.codeSuffix||'1')}
 function updateCodeSuffix(v){if(!['1','2','3','4'].includes(String(v)))return;state.codeSuffix=String(v);localStorage.setItem('eodState',JSON.stringify(state));scheduleCloudSave();const code=generateScreeningCode();const ci=document.getElementById('codeInput');if(ci)ci.value=code;const cell=document.getElementById('codeStatusCell');if(cell)cell.textContent=code}
 function addTracking(){let x=document.getElementById('trackingInput').value.trim();if(x){document.getElementById('trackingCountTop').value=x;state.daily=state.daily||{};state.daily.trackingNumbers=x;document.getElementById('trackingInput').value='';persist();toast('Tracking number added ✓')}}
-let scannerStream=null,scannerTimer=null,barcodeDetector=null;
+let html5Scanner=null,scannerStarting=false;
 async function scanLabel(){
-  const box=document.getElementById('scannerBox'),video=document.getElementById('scannerVideo'),status=document.getElementById('scannerStatus');
+  const box=document.getElementById('scannerBox'),status=document.getElementById('scannerStatus');
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('Camera access is not available in this browser.');return}
+  await stopScanner();
+  box.style.display='block';status.textContent='Starting rear camera…';scannerStarting=true;
   try{
-    box.style.display='block';status.textContent='Starting camera…';
-    scannerStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
-    video.srcObject=scannerStream;await video.play();status.textContent='Point the rear camera at the barcode.';
-    if('BarcodeDetector' in window){
-      const supported=await BarcodeDetector.getSupportedFormats();
-      barcodeDetector=new BarcodeDetector({formats:supported});
-      const detect=async()=>{if(!scannerStream)return;try{const codes=await barcodeDetector.detect(video);if(codes.length){applyScannedTracking(codes[0].rawValue);return}}catch(e){}scannerTimer=setTimeout(detect,180)};detect();
-    }else{
-      status.innerHTML='Automatic barcode recognition is not supported by this Safari version. You can still type the tracking number manually.';
+    if(!window.Html5Qrcode)throw new Error('scanner_library_missing');
+    html5Scanner=new Html5Qrcode('scannerReader',{
+      formatsToSupport:[
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.DATA_MATRIX,
+        Html5QrcodeSupportedFormats.PDF_417,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ],
+      verbose:false
+    });
+    const config={
+      fps:12,
+      qrbox:(vw,vh)=>({width:Math.max(220,Math.floor(vw*.90)),height:Math.max(90,Math.floor(vh*.32))}),
+      aspectRatio:1.777778,
+      disableFlip:true
+    };
+    const onSuccess=async(decodedText)=>{
+      if(!decodedText)return;
+      const value=String(decodedText).trim();
+      if(!value)return;
+      status.textContent='Barcode detected ✓';
+      await applyScannedTracking(value);
+    };
+    const onFailure=()=>{};
+    try{
+      await html5Scanner.start({facingMode:{exact:'environment'}},config,onSuccess,onFailure);
+    }catch(firstErr){
+      // Some iPhones reject exact facingMode. Retry with a looser rear-camera preference.
+      if(html5Scanner){try{await html5Scanner.clear()}catch(e){}}
+      html5Scanner=new Html5Qrcode('scannerReader',{formatsToSupport:[Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.DATA_MATRIX,Html5QrcodeSupportedFormats.PDF_417,Html5QrcodeSupportedFormats.QR_CODE],verbose:false});
+      await html5Scanner.start({facingMode:'environment'},config,onSuccess,onFailure);
     }
-  }catch(e){stopScanner();toast(e&&e.name==='NotAllowedError'?'Camera permission was not allowed.':'Could not start the camera.')}
+    scannerStarting=false;
+    status.textContent='Align the barcode with the red line. Scanning automatically…';
+  }catch(e){
+    scannerStarting=false;
+    await stopScanner();
+    const msg=e&&e.name==='NotAllowedError'?'Camera permission was not allowed.':(String(e).includes('scanner_library_missing')?'Scanner library could not load. Check your internet connection and reload the app.':'Could not start the barcode scanner.');
+    toast(msg);
+  }
 }
-function applyScannedTracking(value){
+async function applyScannedTracking(value){
   value=String(value||'').trim();if(!value)return;
   document.getElementById('trackingInput').value=value;
   document.getElementById('trackingCountTop').value=value;
-    state.daily=state.daily||{};state.daily.trackingNumbers=value;
-  stopScanner();persist();toast('Tracking number scanned ✓');
+  state.daily=state.daily||{};state.daily.trackingNumbers=value;
+  await stopScanner();persist();toast('Tracking number scanned ✓');
 }
-function stopScanner(){
-  if(scannerTimer){clearTimeout(scannerTimer);scannerTimer=null}
-  if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null}
-  const v=document.getElementById('scannerVideo');if(v)v.srcObject=null;
+async function stopScanner(){
+  const scanner=html5Scanner;html5Scanner=null;
+  if(scanner){
+    try{if(scanner.getState&&scanner.getState()===Html5QrcodeScannerState.SCANNING)await scanner.stop()}catch(e){}
+    try{await scanner.clear()}catch(e){}
+  }
+  const reader=document.getElementById('scannerReader');if(reader)reader.innerHTML='';
   const b=document.getElementById('scannerBox');if(b)b.style.display='none';
 }
 function saveDailyOps(){state.daily={participants:Number(document.getElementById('totalParticipants').value||0),nps:Number(document.getElementById('dailyNps').value||0),pat:Number(document.getElementById('dailyPat').value||0),upsell:Number(document.getElementById('dailyUpsell').value||0)};persist();toast('Daily Operations updated ✓')}
