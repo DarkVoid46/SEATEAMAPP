@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>End of Day — Clinic Manager</title>
+<style>
+:root{--blue:#0757b8;--blue2:#0b6bd3;--pale:#eef6ff;--yellow:#ffd84d;--ink:#16324f;--muted:#6d8195;--line:#dce8f3;--green:#20a66a;--red:#df4c5a}
+*{box-sizing:border-box} body{margin:0;background:#f4f8fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+.app{max-width:430px;margin:auto;min-height:100vh;background:#fff;box-shadow:0 0 30px #00000012}
+header{background:linear-gradient(145deg,var(--blue),#0878df);color:#fff;padding:28px 20px 22px;border-radius:0 0 24px 24px}
+.brand{font-size:13px;opacity:.8;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.title{font-size:27px;font-weight:800;margin:6px 0}.date{font-size:14px;opacity:.9}
+nav{display:flex;gap:0;overflow:auto;padding:0;border-bottom:1px solid #aebdca;position:sticky;top:0;background:#fff;z-index:2}
+nav button{border:0;border-right:1px solid var(--line);background:#f5f7f9;color:var(--ink);padding:9px 11px;border-radius:0;white-space:nowrap;font-weight:700;font-size:12px}nav button.active{background:#dcecff;color:var(--blue);box-shadow:inset 0 -3px 0 var(--blue)}
+main{padding:18px 16px 90px}.section{display:none}.section.active{display:block}
+.card{border:1px solid var(--line);border-radius:5px;padding:12px;margin-bottom:12px;background:#fff;box-shadow:none}.sheet{border:1px solid #aebdca;background:#fff;margin-bottom:14px}.sheet-title{background:#e9f1f7;border-bottom:1px solid #aebdca;padding:13px 12px;font-size:19px;font-weight:800;color:var(--ink)}.sheet-date{padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}.ops-table{width:100%;border-collapse:collapse}.ops-table th,.ops-table td{border:1px solid var(--line);padding:9px;text-align:left;font-size:13px}.ops-table th{background:#f1f5f8;font-weight:800}.ops-table td:nth-child(2){width:42%;text-align:right}.ops-table input{margin:0;padding:7px;border:0;border-radius:0;text-align:right;background:#fff;outline:none;width:100%}.ops-table input:focus{background:#eef6ff}.percent-input{display:flex;align-items:center;justify-content:flex-end}.percent-input input{padding-right:4px}.percent-input span{font-weight:700;padding-right:4px}.screening-code{font-size:12px;font-weight:700;white-space:nowrap}.sheet>.primary{margin:12px;width:calc(100% - 24px)}
+.card h3{margin:0 0 12px;font-size:17px}.sub{color:var(--muted);font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stat{background:var(--pale);border-radius:15px;padding:14px}.stat b{display:block;font-size:24px;color:var(--blue)}.stat span{font-size:12px;color:var(--muted)}
+.row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #edf2f6}.row:last-child{border:0}.name{font-weight:700}.toggle{width:50px;height:28px;border-radius:20px;background:#d6e1eb;padding:3px;cursor:pointer}.toggle i{display:block;width:22px;height:22px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px #0002}.toggle.on{background:var(--green)}.toggle.on i{transform:translateX(22px)}
+input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;font-size:15px;margin:6px 0 10px;outline:none}input:focus{border-color:var(--blue)}
+button.primary{width:100%;border:0;background:var(--blue);color:#fff;padding:13px;border-radius:12px;font-weight:800;font-size:15px}.scan{background:#0c8a68!important}.mini{font-size:12px;color:var(--muted);margin-top:5px}
+.list{margin-top:10px}.item{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #edf2f6;font-size:13px}.pill{background:#eaf7f1;color:#08734f;padding:4px 8px;border-radius:12px;font-weight:700}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.day{padding:9px 2px;text-align:center;border-radius:9px;font-size:12px;background:#f5f8fb}.day.has{background:#e9f3ff;color:var(--blue);font-weight:800}.day.today{outline:2px solid var(--blue)}
+footer{position:fixed;bottom:0;max-width:430px;width:100%;padding:10px 16px;background:#fff;border-top:1px solid var(--line)}footer button{background:var(--yellow);color:#172d43}
+.toast{position:fixed;left:50%;bottom:75px;transform:translateX(-50%);background:#16324f;color:#fff;padding:10px 15px;border-radius:20px;display:none;font-size:13px}
+.money-input{display:flex;align-items:center;justify-content:flex-end;gap:4px}.money-input span{font-size:18px}.money-input input{width:120px!important}.money-input input::placeholder{opacity:.6}.scanner-box{display:none;margin:12px 0;position:relative}.scanner-box video{width:100%;border-radius:12px;background:#000;max-height:320px;display:block}.scanner-view{position:relative;overflow:hidden;border-radius:12px}.scan-guide{position:absolute;left:5%;right:5%;top:50%;height:3px;background:#ff2d2d;transform:translateY(-50%);box-shadow:0 0 8px rgba(255,45,45,.85);z-index:3;pointer-events:none}.scanner-actions{display:flex;gap:8px;margin-top:8px}.scanner-status{font-size:12px;color:var(--muted);margin:7px 0}
+</style>
+
+<style id="futuristic-redesign">
+:root{--neo:#63e6ff;--neo2:#8b7cff;--ink:#eaf8ff;--muted:#8aa8bb;--panel:rgba(9,25,42,.76);--line:rgba(99,230,255,.22);--bg:#030a12}
+*{box-sizing:border-box}
+html,body{background:radial-gradient(circle at 15% 0%,#102d49 0,#06111e 36%,#02070d 100%) fixed!important;color:var(--ink)!important}
+body{font-family:"Avenir Next","SF Pro Display","Segoe UI",system-ui,sans-serif!important;letter-spacing:.015em}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(99,230,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(99,230,255,.025) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(to bottom,black,transparent 90%)}
+header,.topbar{background:rgba(3,12,22,.78)!important;backdrop-filter:blur(20px) saturate(145%);-webkit-backdrop-filter:blur(20px) saturate(145%);border-bottom:1px solid var(--line)!important;box-shadow:0 10px 40px rgba(0,0,0,.28)}
+h1,h2,h3,.brand,.title{font-family:"Avenir Next Condensed","SF Pro Display",system-ui,sans-serif!important;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 0 18px rgba(99,230,255,.22)}
+.card,.panel,.sheet,.section,section{background:linear-gradient(145deg,rgba(12,31,50,.88),rgba(5,17,30,.76))!important;border:1px solid var(--line)!important;border-radius:18px!important;box-shadow:0 18px 55px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04)!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+nav,.tabs,.nav{background:rgba(4,14,25,.8)!important;border:1px solid rgba(99,230,255,.16)!important;border-radius:16px!important;padding:5px!important;backdrop-filter:blur(16px)}
+nav button,.tabs button,.nav button,.tab{border-radius:11px!important;color:#a8c7d8!important;transition:.2s ease!important}
+nav button.active,.tabs button.active,.nav button.active,.tab.active{background:linear-gradient(135deg,rgba(99,230,255,.22),rgba(139,124,255,.2))!important;color:white!important;box-shadow:0 0 22px rgba(99,230,255,.18),inset 0 0 0 1px rgba(99,230,255,.25)!important}
+input,select,textarea{background:rgba(2,11,20,.82)!important;color:#f3fbff!important;border:1px solid rgba(99,230,255,.25)!important;border-radius:10px!important;box-shadow:inset 0 0 18px rgba(0,0,0,.2)!important}
+input:focus,select:focus,textarea:focus{outline:none!important;border-color:var(--neo)!important;box-shadow:0 0 0 3px rgba(99,230,255,.1),0 0 22px rgba(99,230,255,.12)!important}
+button,.btn{border-radius:11px!important;font-weight:700!important;letter-spacing:.045em!important}
+button:not(.tab):not(nav button),.btn{background:linear-gradient(135deg,#168fba,#635bd8)!important;color:#fff!important;border:1px solid rgba(141,236,255,.35)!important;box-shadow:0 8px 24px rgba(36,155,216,.2)!important}
+table{border-collapse:separate!important;border-spacing:0!important;overflow:hidden;border-radius:14px!important}
+th{background:rgba(99,230,255,.09)!important;color:#aeefff!important;text-transform:uppercase;letter-spacing:.08em;font-size:.76rem}
+td,th{border-color:rgba(99,230,255,.13)!important}
+tr:hover td{background:rgba(99,230,255,.035)!important}
+.small,.muted,.hint{color:var(--muted)!important}
+.badge,.pill{background:rgba(99,230,255,.1)!important;border:1px solid rgba(99,230,255,.22)!important;color:#bff4ff!important}
+@media(max-width:700px){body{padding-bottom:calc(16px + env(safe-area-inset-bottom))!important}.card,.panel,.sheet,.section,section{border-radius:15px!important}h1{font-size:1.35rem!important}input,button{min-height:44px}}
+</style>
+
+<style id="green-end-of-day-glow">
+/* Solid neon green outline for the END OF DAY hero title */
+.hero h1, header h1, .hero-title, .masthead h1 {
+  -webkit-text-stroke: 1.25px #39ff88 !important;
+  text-shadow: none !important;
+}
+</style>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#03111f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SEA Team">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+<div class="app">
+<header><div class="brand">Seattle Team</div><div class="title">End of Day</div><div class="date" id="headerDate"></div></header>
+<nav>
+<button class="active" onclick="show('dashboard',this)">Daily Operations</button><button onclick="show('employees',this)">Employees</button><button onclick="show('codes',this)">Codes</button><button onclick="show('tracking',this)">Tracking</button><button onclick="show('calendar',this)">Calendar</button>
+</nav>
+<main>
+<section id="dashboard" class="section active">
+<div class="sheet">
+<div class="sheet-title">Daily Operations</div>
+<div class="sheet-date">End-of-day worksheet · <span id="sheetDate"></span></div>
+<table class="ops-table"><thead><tr><th>Metric</th><th>Daily Total</th></tr></thead><tbody>
+<tr><td>Participants</td><td><input id="totalParticipantsTop" type="number" min="0" placeholder=""></td></tr>
+<tr><td>Daily NPS</td><td><div class="percent-input"><input id="dailyNpsTop" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder=""><span>%</span></div></td></tr>
+<tr><td>Monthly NPS</td><td><div class="percent-input"><input id="monthlyNpsTop" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder=""><span>%</span></div></td></tr>
+<tr><td>Daily PAT</td><td><div class="money-input"><span>$</span><input id="dailyPatTop" type="number" min="0" step="0.01" placeholder="" readonly></div></td></tr>
+<tr><td>Monthly PAT</td><td><div class="money-input"><span>$</span><input id="monthlyPatTop" type="number" min="0" step="0.01" placeholder=""></div></td></tr>
+<tr><td>Upsell</td><td><input id="dailyUpsellTop" type="number" min="0" step="0.01" placeholder=""></td></tr>
+<tr><td>Screening Code</td><td><span id="codeStatusCell" class="screening-code"></span></td></tr>
+<tr><td>Tracking Number</td><td><input id="trackingCountTop" type="text" placeholder="Enter tracking number"></td></tr>
+<tr><td>Employees Present</td><td><input id="employeesPresentTop" type="text" value="" readonly aria-label="Employees present"></td></tr>
+<tr><td>Filled By</td><td><input id="filledByTop" type="text" placeholder="Enter name" autocomplete="name"></td></tr>
+</tbody></table>
+<button class="primary" onclick="saveTopDailyOps()">All Changes Save Automatically</button>
+</div></section>
+
+<section id="employees" class="section">
+<div class="card"><h3>Employee attendance</h3><p class="sub">Tap the switch for everyone who showed up.</p>
+<div id="employeesList"></div></div>
+</section>
+
+<section id="codes" class="section">
+<div class="card"><h3>Screening code</h3><p class="sub">The daily code is generated automatically. Choose the final digit from 1–4.</p><div style="display:flex;gap:10px;align-items:center"><input id="codePrefix" readonly style="flex:1;margin:6px 0 10px"><select id="codeSuffix" aria-label="Screening code final digit" onchange="updateCodeSuffix(this.value)" style="width:82px;margin:6px 0 10px"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div><input id="codeInput" type="hidden"></div>
+</section>
+
+<section id="tracking" class="section">
+<div class="card"><h3>Tracking numbers</h3><p class="sub">Scan a shipping label or enter the number manually.</p>
+<button class="primary scan" onclick="scanLabel()">▣ Scan tracking label</button>
+<div id="scannerBox" class="scanner-box"><div class="scanner-view"><video id="scannerVideo" playsinline muted></video><div class="scan-guide" aria-hidden="true"></div></div><div id="scannerStatus" class="scanner-status">Point the camera at the barcode.</div><div class="scanner-actions"><button class="primary" type="button" onclick="stopScanner()">Cancel scanner</button></div></div>
+<input id="trackingInput" placeholder="Enter tracking number manually"><button class="primary" onclick="addTracking()">Add tracking number</button>
+</div>
+</section>
+
+<section id="dailyops" class="section">
+<div class="card"><h3>Daily Operations</h3><p class="sub">Enter your end-of-day totals manually. No participant information is collected.</p><label class="mini">Total Participants</label><input id="totalParticipants" type="number" min="0" placeholder="Enter total participants"><label class="mini">NPS</label><input id="dailyNps" type="number" min="0" placeholder="Enter NPS total"><label class="mini">PAT</label><input id="dailyPat" type="number" min="0" placeholder="Enter PAT total"><label class="mini">Upsell</label><input id="dailyUpsell" type="number" min="0" placeholder="Enter Upsell total"><button class="primary" onclick="saveDailyOps()">Save Daily Operations</button></div><div class="card"><h3>Today's totals</h3><div class="stats"><div class="stat"><b id="dParticipants">0</b><span>Participants</span></div><div class="stat"><b id="dNps">0</b><span>NPS</span></div><div class="stat"><b id="dPat">0</b><span>PAT</span></div><div class="stat"><b id="dUpsell">0</b><span>Upsell</span></div></div></div>
+</section>
+
+<section id="calendar" class="section">
+<div class="card"><h3>September 2026</h3><p class="sub">Days with saved reports are highlighted.</p><div class="calendar" id="calendarGrid"></div></div>
+<div class="card"><h3>Selected day</h3><div id="selectedDay" class="sub">Tap a date above.</div></div>
+</section>
+</main>
+<footer><button class="primary" onclick="saveDay()">All Changes Save Automatically</button></footer>
+<div class="toast" id="toast"></div>
+</div>
+<script>
+const today=new Date(); const dateKey=today.toISOString().slice(0,10);
+let state=JSON.parse(localStorage.getItem('eodState')||'null')||{date:dateKey,employees:{},codes:[],tracking:[],daily:{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''},saved:{}};
+if(state.date!==dateKey){state={date:dateKey,employees:{},codes:[],tracking:[],daily:{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''},saved:state.saved||{},floaterName:state.floaterName||'',codeSuffix:'1'}}
+const employees=['Marina','Taylor','Mia','Victor','Floater'];
+if(!state.floaterName) state.floaterName='';
+if(!state.codeSuffix || !['1','2','3','4'].includes(String(state.codeSuffix))) state.codeSuffix='1';
+state.tracking=[]; // legacy tracking history disabled; only the current report tracking number is retained
+document.getElementById('headerDate').textContent=today.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+function persist(){localStorage.setItem('eodState',JSON.stringify(state));render()}
+function show(id,btn){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');}
+function render(){
+document.getElementById('sheetDate').textContent=today.toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'});const td=state.daily||{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''};document.getElementById('totalParticipantsTop').value=td.participants||'';document.getElementById('dailyNpsTop').value=td.nps||'';document.getElementById('monthlyNpsTop').value=td.monthlyNps||'';document.getElementById('dailyPatTop').value=td.pat?Number(td.pat).toFixed(2):'';document.getElementById('monthlyPatTop').value=td.monthlyPat?Number(td.monthlyPat).toFixed(2):'';document.getElementById('dailyUpsellTop').value=td.upsell||'';document.getElementById('trackingCountTop').value=td.trackingNumbers||'';const checkedEmployees=employees.filter(n=>!!state.employees[n]).length;document.getElementById('employeesPresentTop').value=checkedEmployees?`${checkedEmployees}/${employees.length}`:'';document.getElementById('filledByTop').value=td.filledBy||'';document.getElementById('employeesList').innerHTML=employees.map(n=>n==='Floater'?`<div class="row"><div style="flex:1;padding-right:12px"><span class="mini" style="display:block;margin:0 0 3px">Floater</span><input id="floaterNameInput" type="text" value="${escapeHtml(state.floaterName||'')}" placeholder="Type floater name" style="margin:0" oninput="updateFloaterName(this.value)"></div><div class="toggle ${state.employees[n]?'on':''}" onclick="toggleEmp('Floater')"><i></i></div></div>`:`<div class="row"><span class="name">${n}</span><div class="toggle ${state.employees[n]?'on':''}" onclick="toggleEmp('${n}')"><i></i></div></div>`).join('');
+const code=generateScreeningCode();document.getElementById('codeInput').value=code;document.getElementById('codeStatusCell').textContent=code;const cp=document.getElementById('codePrefix');if(cp)cp.value=generateScreeningCodePrefix();const cs=document.getElementById('codeSuffix');if(cs)cs.value=String(state.codeSuffix||'1');
+
+calendar();
+}
+function escapeHtml(v){return String(v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]))}
+function updateFloaterName(v){state.floaterName=v;localStorage.setItem('eodState',JSON.stringify(state));autoSaveCurrentReport()}
+function toggleEmp(n){state.employees[n]=!state.employees[n];state.daily=state.daily||{};state.daily.employeesPresent=employees.filter(name=>!!state.employees[name]).length;persist();autoSaveCurrentReport()}
+function generateScreeningCodePrefix(){const d=new Date(state.date+'T00:00:00');const yy=String(d.getFullYear()).slice(-2);const mm=String(d.getMonth()+1).padStart(2,'0');const dd=String(d.getDate()).padStart(2,'0');return `${yy}-${mm}${dd}_SEA,`}
+function generateScreeningCode(){return generateScreeningCodePrefix()+String(state.codeSuffix||'1')}
+function updateCodeSuffix(v){if(!['1','2','3','4'].includes(String(v)))return;state.codeSuffix=String(v);localStorage.setItem('eodState',JSON.stringify(state));const code=generateScreeningCode();const ci=document.getElementById('codeInput');if(ci)ci.value=code;const cell=document.getElementById('codeStatusCell');if(cell)cell.textContent=code}
+function addTracking(){let x=document.getElementById('trackingInput').value.trim();if(x){document.getElementById('trackingCountTop').value=x;state.daily=state.daily||{};state.daily.trackingNumbers=x;document.getElementById('trackingInput').value='';persist();toast('Tracking number added ✓')}}
+let scannerStream=null,scannerTimer=null,barcodeDetector=null;
+async function scanLabel(){
+  const box=document.getElementById('scannerBox'),video=document.getElementById('scannerVideo'),status=document.getElementById('scannerStatus');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('Camera access is not available in this browser.');return}
+  try{
+    box.style.display='block';status.textContent='Starting camera…';
+    scannerStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    video.srcObject=scannerStream;await video.play();status.textContent='Point the rear camera at the barcode.';
+    if('BarcodeDetector' in window){
+      const supported=await BarcodeDetector.getSupportedFormats();
+      barcodeDetector=new BarcodeDetector({formats:supported});
+      const detect=async()=>{if(!scannerStream)return;try{const codes=await barcodeDetector.detect(video);if(codes.length){applyScannedTracking(codes[0].rawValue);return}}catch(e){}scannerTimer=setTimeout(detect,180)};detect();
+    }else{
+      status.innerHTML='Automatic barcode recognition is not supported by this Safari version. You can still type the tracking number manually.';
+    }
+  }catch(e){stopScanner();toast(e&&e.name==='NotAllowedError'?'Camera permission was not allowed.':'Could not start the camera.')}
+}
+function applyScannedTracking(value){
+  value=String(value||'').trim();if(!value)return;
+  document.getElementById('trackingInput').value=value;
+  document.getElementById('trackingCountTop').value=value;
+    state.daily=state.daily||{};state.daily.trackingNumbers=value;
+  stopScanner();persist();toast('Tracking number scanned ✓');
+}
+function stopScanner(){
+  if(scannerTimer){clearTimeout(scannerTimer);scannerTimer=null}
+  if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null}
+  const v=document.getElementById('scannerVideo');if(v)v.srcObject=null;
+  const b=document.getElementById('scannerBox');if(b)b.style.display='none';
+}
+function saveDailyOps(){state.daily={participants:Number(document.getElementById('totalParticipants').value||0),nps:Number(document.getElementById('dailyNps').value||0),pat:Number(document.getElementById('dailyPat').value||0),upsell:Number(document.getElementById('dailyUpsell').value||0)};persist();toast('Daily Operations updated ✓')}
+function updateMonthlyPAT(){
+  const now=new Date();
+  const monthKey=now.toISOString().slice(0,7);
+  let total=0;
+  const days=JSON.parse(localStorage.getItem('eodDays')||'{}');
+  Object.keys(days).forEach(k=>{ if(k.startsWith(monthKey)) total += Number(days[k].pat||days[k].dailyPat||0); });
+  const current=Number(document.getElementById('dailyPatTop')?.value||0);
+  const todayKey=now.toISOString().slice(0,10);
+  const savedToday=Number(days[todayKey]?.pat||days[todayKey]?.dailyPat||0);
+  total += current - savedToday;
+  const el=document.getElementById('monthlyPatTop'); if(el) el.textContent=total;
+}
+
+function calculateDailyPAT(){const pEl=document.getElementById('totalParticipantsTop'),uEl=document.getElementById('dailyUpsellTop'),out=document.getElementById('dailyPatTop');const participants=Number(pEl.value||0),upsell=Number(uEl.value||0);if(!pEl.value||!uEl.value||participants<=0){out.value='';return 0}const pat=upsell/participants;out.value=pat.toFixed(2);return pat}
+document.getElementById('totalParticipantsTop').addEventListener('input',calculateDailyPAT);document.getElementById('dailyUpsellTop').addEventListener('input',calculateDailyPAT);
+function saveTopDailyOps(){const pat=calculateDailyPAT();state.daily={participants:Number(document.getElementById('totalParticipantsTop').value||0),nps:Number(document.getElementById('dailyNpsTop').value||0),monthlyNps:Number(document.getElementById('monthlyNpsTop').value||0),pat:pat,monthlyPat:Number(document.getElementById('monthlyPatTop').value||0),upsell:Number(document.getElementById('dailyUpsellTop').value||0),trackingNumbers:document.getElementById('trackingCountTop').value.trim(),employeesPresent:employees.filter(name=>!!state.employees[name]).length,filledBy:document.getElementById('filledByTop').value.trim()};saveDay()}
+function saveDay(){const d=state.daily||{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''};state.saved[state.date]={employees:state.employees,floaterName:state.floaterName||'',screeningCode:generateScreeningCode(),tracking:d.trackingNumbers,employeesPresent:d.employeesPresent,participants:d.participants,nps:d.nps,monthlyNps:d.monthlyNps,pat:d.pat,monthlyPat:d.monthlyPat,upsell:d.upsell,filledBy:d.filledBy||''};persist();toast('End-of-day report saved ✓')}
+function calendar(){let g=document.getElementById('calendarGrid');let first=new Date(2026,8,1).getDay(),days=new Date(2026,9,0).getDate();g.innerHTML=['S','M','T','W','T','F','S'].map(x=>`<b style="text-align:center;font-size:11px">${x}</b>`).join('');for(let i=0;i<first;i++)g.innerHTML+='<span></span>';for(let d=1;d<=days;d++){let k=`2026-09-${String(d).padStart(2,'0')}`;g.innerHTML+=`<button class="day ${state.saved[k]?'has':''} ${k===dateKey?'today':''}" onclick="selectDay('${k}')">${d}</button>`}}
+function formatCurrency(v){return '$'+Number(v||0).toFixed(2)}
+function selectDay(k){let x=state.saved[k];document.getElementById('selectedDay').innerHTML=x?`<b>${k}</b><br>Participants: ${x.participants}<br>Daily NPS: ${x.nps}%<br>Monthly NPS: ${x.monthlyNps||0}%<br>PAT: ${x.pat}<br>Upsell: ${formatCurrency(x.upsell)}<br>Screening Code: ${x.screeningCode||generateScreeningCode()}<br>Tracking Number: ${x.tracking||'—'}<br>Employees Present: ${Number(x.employeesPresent||0)}/${employees.length}<br>Filled By: ${x.filledBy||'—'}`:`No saved report for ${k}.`}
+function toast(t){let e=document.getElementById('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2200)}
+
+function autoSaveCurrentReport(){
+  const pat=calculateDailyPAT();
+  state.daily=state.daily||{};
+  state.daily.participants=document.getElementById('totalParticipantsTop').value===''?'':Number(document.getElementById('totalParticipantsTop').value);
+  state.daily.nps=document.getElementById('dailyNpsTop').value===''?'':Number(document.getElementById('dailyNpsTop').value);
+  state.daily.monthlyNps=document.getElementById('monthlyNpsTop').value===''?'':Number(document.getElementById('monthlyNpsTop').value);
+  state.daily.pat=document.getElementById('dailyPatTop').value===''?'':pat;
+  state.daily.monthlyPat=document.getElementById('monthlyPatTop').value===''?'':Number(document.getElementById('monthlyPatTop').value);
+  state.daily.upsell=document.getElementById('dailyUpsellTop').value===''?'':Number(document.getElementById('dailyUpsellTop').value);
+  state.daily.trackingNumbers=document.getElementById('trackingCountTop').value.trim();
+  state.daily.employeesPresent=employees.filter(name=>!!state.employees[name]).length;
+  state.daily.filledBy=document.getElementById('filledByTop').value.trim();
+  state.saved[state.date]={employees:state.employees,floaterName:state.floaterName||'',screeningCode:generateScreeningCode(),tracking:state.daily.trackingNumbers,employeesPresent:state.daily.employeesPresent,participants:state.daily.participants,nps:state.daily.nps,monthlyNps:state.daily.monthlyNps,pat:state.daily.pat,monthlyPat:state.daily.monthlyPat,upsell:state.daily.upsell,filledBy:state.daily.filledBy};
+  localStorage.setItem('eodState',JSON.stringify(state));
+  calendar();
+}
+['totalParticipantsTop','dailyNpsTop','monthlyNpsTop','monthlyPatTop','dailyUpsellTop','trackingCountTop','filledByTop'].forEach(id=>document.getElementById(id)?.addEventListener('input',autoSaveCurrentReport));
+
+render();calculateDailyPAT();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(console.error));
+}
+</script>
+
+</body>
+</html><style id="dark-blue-surface-fix">
+/* Replace remaining light/beige surfaces with deep navy */
+.app{background:#06111e!important}
+nav button{background:#0a1b2d!important;color:#a9c8da!important;border-color:rgba(99,230,255,.16)!important}
+nav button.active{color:#fff!important}
+.sheet-title{background:#0b2035!important;color:#eaf8ff!important;border-color:rgba(99,230,255,.22)!important}
+.sheet-date{background:#071827!important;color:#8aa8bb!important;border-color:rgba(99,230,255,.16)!important}
+.ops-table th{background:#0b263b!important;color:#aeefff!important}
+.ops-table td{background:#071a2b!important;color:#eaf8ff!important;border-color:rgba(99,230,255,.15)!important}
+.ops-table input{background:#03101c!important;color:#f3fbff!important}
+.ops-table input:focus{background:#061d30!important}
+.day{background:#0a1b2d!important;color:#cfefff!important}.day.has{background:#0d304a!important;color:#7eeaff!important}
+footer{background:#06111e!important;border-color:rgba(99,230,255,.18)!important}
+</style>
