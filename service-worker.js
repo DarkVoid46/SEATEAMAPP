@@ -1,4 +1,4 @@
-const CACHE='sea-team-eod-v7-input-fix';
+const CACHE='sea-team-eod-v8-cloud-calendar';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',event=>{
   self.skipWaiting();

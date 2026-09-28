@@ -82,7 +82,7 @@ tr:hover td{background:rgba(99,230,255,.035)!important}
 <section id="dashboard" class="section active">
 <div class="sheet">
 <div class="sheet-title">Daily Operations</div>
-<div class="sheet-date">End-of-day worksheet · <span id="sheetDate"></span></div>
+<div class="sheet-date">End-of-day worksheet · <span id="sheetDate"></span><br><span id="syncStatus" role="status" aria-live="polite">Checking cloud…</span></div>
 <table class="ops-table"><thead><tr><th>Metric</th><th>Daily Total</th></tr></thead><tbody>
 <tr><td>Participants</td><td><input id="totalParticipantsTop" type="number" min="0" placeholder=""></td></tr>
 <tr><td>Daily NPS</td><td><div class="percent-input"><input id="dailyNpsTop" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder=""><span>%</span></div></td></tr>
@@ -95,7 +95,7 @@ tr:hover td{background:rgba(99,230,255,.035)!important}
 <tr><td>Employees Present</td><td><input id="employeesPresentTop" type="text" value="" readonly aria-label="Employees present"></td></tr>
 <tr><td>Filled By</td><td><input id="filledByTop" type="text" placeholder="Enter name" autocomplete="name"></td></tr>
 </tbody></table>
-<button class="primary" onclick="saveTopDailyOps()">All Changes Save Automatically</button>
+<button class="primary" onclick="saveTopDailyOps()">Save now</button>
 </div></section>
 
 <section id="employees" class="section">
@@ -120,27 +120,40 @@ tr:hover td{background:rgba(99,230,255,.035)!important}
 </section>
 
 <section id="calendar" class="section">
-<div class="card"><h3>September 2026</h3><p class="sub">Days with saved reports are highlighted.</p><div class="calendar" id="calendarGrid"></div></div>
+<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button type="button" onclick="changeCalendarMonth(-1)" aria-label="Previous month">‹</button><h3 id="calendarMonth" style="margin:0"></h3><button type="button" onclick="changeCalendarMonth(1)" aria-label="Next month">›</button></div><p id="calendarStatus" class="sub" role="status">Choose a date to load its report from the cloud.</p><div class="calendar" id="calendarGrid"></div><button type="button" class="primary" style="margin-top:12px" onclick="refreshCalendar()">Refresh reports</button></div>
 <div class="card"><h3>Selected day</h3><div id="selectedDay" class="sub">Tap a date above.</div></div>
 </section>
 </main>
-<footer><button class="primary" onclick="saveDay()">All Changes Save Automatically</button></footer>
+<footer><button class="primary" onclick="saveDay()">Save now</button></footer>
 <div class="toast" id="toast"></div>
 </div>
 <script>
-const today=new Date(); const dateKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
-let state=JSON.parse(localStorage.getItem('eodState')||'null')||{date:dateKey,employees:{},codes:[],tracking:[],daily:{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''},saved:{}};
-if(state.date!==dateKey){state={date:dateKey,employees:{},codes:[],tracking:[],daily:{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''},saved:state.saved||{},floaterName:state.floaterName||'',codeSuffix:'1'}}
+function localDateKey(d=new Date()){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+const today=new Date(),dateKey=localDateKey(today);
+function blankDaily(){return {participants:'',nps:'',monthlyNps:'',pat:'',monthlyPat:'',upsell:'',trackingNumbers:'',employeesPresent:0,filledBy:''}}
+function readLocal(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')||fallback}catch(e){return fallback}}
+let state=readLocal('eodState',{date:dateKey,employees:{},codes:[],tracking:[],daily:blankDaily(),saved:{}});
+state.saved=state.saved||{};
+function codeForDate(k,suffix='1'){return k.slice(2,4)+'-'+k.slice(5,7)+k.slice(8,10)+'_SEA,'+suffix}
+function snapshotFromState(source){const d=source.daily||{};return {employees:{...source.employees},floaterName:source.floaterName||'',screeningCode:codeForDate(source.date,source.codeSuffix||'1'),tracking:d.trackingNumbers||'',employeesPresent:Object.values(source.employees||{}).filter(Boolean).length,participants:d.participants??'',nps:d.nps??'',monthlyNps:d.monthlyNps??'',pat:d.pat??'',monthlyPat:d.monthlyPat??'',upsell:d.upsell??'',filledBy:d.filledBy||''}}
+if(state.date!==dateKey){
+  const old=state.daily||{};
+  if(state.date&&(state.saved[state.date]||Object.values(old).some(v=>v!==''&&v!==0&&v!==null&&v!==undefined)||Object.values(state.employees||{}).some(Boolean)))state.saved[state.date]=snapshotFromState(state);
+  state={date:dateKey,employees:{},codes:[],tracking:[],daily:blankDaily(),saved:state.saved,floaterName:'',codeSuffix:'1'};
+}
+let calendarView=new Date(today.getFullYear(),today.getMonth(),1),selectedCalendarDate=null,calendarRequest=0;
+function storeState(){try{localStorage.setItem('eodState',JSON.stringify(state))}catch(e){setSyncStatus('Device storage is full. Keep this tab open until cloud saving succeeds.')}}
+function cacheCurrentReport(){state.saved[state.date]=snapshotFromState(state);storeState()}
 const employees=['Marina','Taylor','Mia','Victor','Floater'];
 if(!state.floaterName) state.floaterName='';
 if(!state.codeSuffix || !['1','2','3','4'].includes(String(state.codeSuffix))) state.codeSuffix='1';
 state.tracking=[]; // legacy tracking history disabled; only the current report tracking number is retained
 document.getElementById('headerDate').textContent=today.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-function persist(){localStorage.setItem('eodState',JSON.stringify(state));render();scheduleCloudSave()}
+function persist(){cacheCurrentReport();render();scheduleCloudSave()}
 function setDisplayedValue(id,value){const input=document.getElementById(id);if(input&&input!==document.activeElement)input.value=value}
-function show(id,btn){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');}
+function show(id,btn){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');if(id==='calendar')loadCalendarMonth();}
 function render(){
-document.getElementById('sheetDate').textContent=today.toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'});const td=state.daily||{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''};setDisplayedValue('totalParticipantsTop',td.participants||'');setDisplayedValue('dailyNpsTop',td.nps||'');setDisplayedValue('monthlyNpsTop',td.monthlyNps||'');setDisplayedValue('dailyPatTop',td.pat?Number(td.pat).toFixed(2):'');setDisplayedValue('monthlyPatTop',td.monthlyPat?Number(td.monthlyPat).toFixed(2):'');setDisplayedValue('dailyUpsellTop',td.upsell||'');setDisplayedValue('trackingCountTop',td.trackingNumbers||'');const checkedEmployees=employees.filter(n=>!!state.employees[n]).length;setDisplayedValue('employeesPresentTop',checkedEmployees?`${checkedEmployees}/${employees.length}`:'');setDisplayedValue('filledByTop',td.filledBy||'');if(document.activeElement?.id!=='floaterNameInput')document.getElementById('employeesList').innerHTML=employees.map(n=>n==='Floater'?`<div class="row"><div style="flex:1;padding-right:12px"><span class="mini" style="display:block;margin:0 0 3px">Floater</span><input id="floaterNameInput" type="text" value="${escapeHtml(state.floaterName||'')}" placeholder="Type floater name" style="margin:0" oninput="updateFloaterName(this.value)"></div><div class="toggle ${state.employees[n]?'on':''}" onclick="toggleEmp('Floater')"><i></i></div></div>`:`<div class="row"><span class="name">${n}</span><div class="toggle ${state.employees[n]?'on':''}" onclick="toggleEmp('${n}')"><i></i></div></div>`).join('');
+document.getElementById('sheetDate').textContent=today.toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'});const td=state.daily||{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''};setDisplayedValue('totalParticipantsTop',td.participants??'');setDisplayedValue('dailyNpsTop',td.nps??'');setDisplayedValue('monthlyNpsTop',td.monthlyNps??'');setDisplayedValue('dailyPatTop',td.pat!==''&&td.pat!=null?Number(td.pat).toFixed(2):'');setDisplayedValue('monthlyPatTop',td.monthlyPat!==''&&td.monthlyPat!=null?Number(td.monthlyPat).toFixed(2):'');setDisplayedValue('dailyUpsellTop',td.upsell??'');setDisplayedValue('trackingCountTop',td.trackingNumbers||'');const checkedEmployees=employees.filter(n=>!!state.employees[n]).length;setDisplayedValue('employeesPresentTop',checkedEmployees?`${checkedEmployees}/${employees.length}`:'');setDisplayedValue('filledByTop',td.filledBy||'');if(document.activeElement?.id!=='floaterNameInput')document.getElementById('employeesList').innerHTML=employees.map(n=>n==='Floater'?`<div class="row"><div style="flex:1;padding-right:12px"><span class="mini" style="display:block;margin:0 0 3px">Floater</span><input id="floaterNameInput" type="text" value="${escapeHtml(state.floaterName||'')}" placeholder="Type floater name" style="margin:0" oninput="updateFloaterName(this.value)"></div><div class="toggle ${state.employees[n]?'on':''}" onclick="toggleEmp('Floater')"><i></i></div></div>`:`<div class="row"><span class="name">${n}</span><div class="toggle ${state.employees[n]?'on':''}" onclick="toggleEmp('${n}')"><i></i></div></div>`).join('');
 const code=generateScreeningCode();document.getElementById('codeInput').value=code;document.getElementById('codeStatusCell').textContent=code;const cp=document.getElementById('codePrefix');if(cp)cp.value=generateScreeningCodePrefix();const cs=document.getElementById('codeSuffix');if(cs)cs.value=String(state.codeSuffix||'1');
 
 calendar();
@@ -150,7 +163,7 @@ function updateFloaterName(v){state.floaterName=v;localStorage.setItem('eodState
 function toggleEmp(n){state.employees[n]=!state.employees[n];state.daily=state.daily||{};state.daily.employeesPresent=employees.filter(name=>!!state.employees[name]).length;persist();autoSaveCurrentReport()}
 function generateScreeningCodePrefix(){const d=new Date(state.date+'T00:00:00');const yy=String(d.getFullYear()).slice(-2);const mm=String(d.getMonth()+1).padStart(2,'0');const dd=String(d.getDate()).padStart(2,'0');return `${yy}-${mm}${dd}_SEA,`}
 function generateScreeningCode(){return generateScreeningCodePrefix()+String(state.codeSuffix||'1')}
-function updateCodeSuffix(v){if(!['1','2','3','4'].includes(String(v)))return;state.codeSuffix=String(v);localStorage.setItem('eodState',JSON.stringify(state));scheduleCloudSave();const code=generateScreeningCode();const ci=document.getElementById('codeInput');if(ci)ci.value=code;const cell=document.getElementById('codeStatusCell');if(cell)cell.textContent=code}
+function updateCodeSuffix(v){if(!['1','2','3','4'].includes(String(v)))return;state.codeSuffix=String(v);cacheCurrentReport();scheduleCloudSave();const code=generateScreeningCode();const ci=document.getElementById('codeInput');if(ci)ci.value=code;const cell=document.getElementById('codeStatusCell');if(cell)cell.textContent=code}
 function addTracking(){let x=document.getElementById('trackingInput').value.trim();if(x){document.getElementById('trackingCountTop').value=x;state.daily=state.daily||{};state.daily.trackingNumbers=x;document.getElementById('trackingInput').value='';persist();toast('Tracking number added ✓')}}
 let html5Scanner=null,scannerStarting=false;
 async function scanLabel(){
@@ -239,11 +252,57 @@ function updateMonthlyPAT(){
 
 function calculateDailyPAT(){const pEl=document.getElementById('totalParticipantsTop'),uEl=document.getElementById('dailyUpsellTop'),out=document.getElementById('dailyPatTop');const participants=Number(pEl.value||0),upsell=Number(uEl.value||0);if(!pEl.value||!uEl.value||participants<=0){out.value='';return 0}const pat=upsell/participants;out.value=pat.toFixed(2);return pat}
 document.getElementById('totalParticipantsTop').addEventListener('input',calculateDailyPAT);document.getElementById('dailyUpsellTop').addEventListener('input',calculateDailyPAT);
-function saveTopDailyOps(){const pat=calculateDailyPAT();state.daily={participants:Number(document.getElementById('totalParticipantsTop').value||0),nps:Number(document.getElementById('dailyNpsTop').value||0),monthlyNps:Number(document.getElementById('monthlyNpsTop').value||0),pat:pat,monthlyPat:Number(document.getElementById('monthlyPatTop').value||0),upsell:Number(document.getElementById('dailyUpsellTop').value||0),trackingNumbers:document.getElementById('trackingCountTop').value.trim(),employeesPresent:employees.filter(name=>!!state.employees[name]).length,filledBy:document.getElementById('filledByTop').value.trim()};saveDay()}
-function saveDay(){const d=state.daily||{participants:0,nps:0,monthlyNps:0,pat:0,monthlyPat:0,upsell:0,trackingNumbers:'',employeesPresent:0,filledBy:''};state.saved[state.date]={employees:state.employees,floaterName:state.floaterName||'',screeningCode:generateScreeningCode(),tracking:d.trackingNumbers,employeesPresent:d.employeesPresent,participants:d.participants,nps:d.nps,monthlyNps:d.monthlyNps,pat:d.pat,monthlyPat:d.monthlyPat,upsell:d.upsell,filledBy:d.filledBy||''};persist();toast('End-of-day report saved ✓')}
-function calendar(){let g=document.getElementById('calendarGrid');let first=new Date(2026,8,1).getDay(),days=new Date(2026,9,0).getDate();g.innerHTML=['S','M','T','W','T','F','S'].map(x=>`<b style="text-align:center;font-size:11px">${x}</b>`).join('');for(let i=0;i<first;i++)g.innerHTML+='<span></span>';for(let d=1;d<=days;d++){let k=`2026-09-${String(d).padStart(2,'0')}`;g.innerHTML+=`<button class="day ${state.saved[k]?'has':''} ${k===dateKey?'today':''}" onclick="selectDay('${k}')">${d}</button>`}}
-function formatCurrency(v){return '$'+Number(v||0).toFixed(2)}
-function selectDay(k){let x=state.saved[k];document.getElementById('selectedDay').innerHTML=x?`<b>${k}</b><br>Participants: ${x.participants}<br>Daily NPS: ${x.nps}%<br>Monthly NPS: ${x.monthlyNps||0}%<br>PAT: ${x.pat}<br>Upsell: ${formatCurrency(x.upsell)}<br>Screening Code: ${x.screeningCode||generateScreeningCode()}<br>Tracking Number: ${x.tracking||'—'}<br>Employees Present: ${Number(x.employeesPresent||0)}/${employees.length}<br>Filled By: ${x.filledBy||'—'}`:`No saved report for ${k}.`}
+function saveTopDailyOps(){return saveDay()}
+async function saveDay(){autoSaveCurrentReport();await saveCloud()}
+function calendar(){
+  const g=document.getElementById('calendarGrid'),year=calendarView.getFullYear(),month=calendarView.getMonth();
+  document.getElementById('calendarMonth').textContent=calendarView.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  let html=['S','M','T','W','T','F','S'].map(x=>`<b style="text-align:center;font-size:11px">${x}</b>`).join('');
+  html+='<span></span>'.repeat(new Date(year,month,1).getDay());
+  for(let d=1;d<=new Date(year,month+1,0).getDate();d++){
+    const k=localDateKey(new Date(year,month,d));
+    html+=`<button type="button" class="day ${state.saved[k]?'has':''} ${k===dateKey?'today':''}" aria-pressed="${k===selectedCalendarDate}" onclick="selectDay('${k}')">${d}${state.saved[k]?' •':''}</button>`;
+  }
+  g.innerHTML=html;
+}
+function formatCurrency(v){return v===''||v==null?'—':'$'+Number(v).toFixed(2)}
+function displaySelectedDay(k,message,allowUpload=false){
+  if(k!==selectedCalendarDate)return;
+  const x=state.saved[k],target=document.getElementById('selectedDay');
+  const number=v=>v===''||v==null?'—':escapeHtml(v);
+  const percent=v=>v===''||v==null?'—':escapeHtml(v)+'%';
+  const present=x?employees.filter(name=>x.employees?.[name]).map(name=>name==='Floater'?(x.floaterName||'Floater'):name):[];
+  target.innerHTML=`<b>${escapeHtml(k)}</b><p>${escapeHtml(message)}</p>`+(x?`Participants: ${number(x.participants)}<br>Daily NPS: ${percent(x.nps)}<br>Monthly NPS: ${percent(x.monthlyNps)}<br>Daily PAT: ${formatCurrency(x.pat)}<br>Monthly PAT: ${formatCurrency(x.monthlyPat)}<br>Upsell: ${formatCurrency(x.upsell)}<br>Screening Code: ${escapeHtml(x.screeningCode||codeForDate(k))}<br>Tracking Number: ${escapeHtml(x.tracking||'—')}<br>Employees Present: ${number(x.employeesPresent)}/${employees.length}<br>Names: ${escapeHtml(present.join(', ')||'—')}<br>Filled By: ${escapeHtml(x.filledBy||'—')}`:'');
+  if(allowUpload&&x)target.innerHTML+=`<button type="button" class="primary" style="margin-top:12px" onclick="uploadLocalReport('${k}')">Save this local copy to cloud</button>`;
+}
+async function loadCalendarMonth(){
+  const month=localDateKey(calendarView),next=localDateKey(new Date(calendarView.getFullYear(),calendarView.getMonth()+1,1));
+  const request=++calendarRequest,status=document.getElementById('calendarStatus');
+  if(!cloudReady){status.textContent='Sign in to load cloud reports. Cached reports stay on this device.';return}
+  status.textContent='Loading cloud reports…';
+  try{
+    const {data,error}=await sb.from('daily_reports').select('*').gte('report_date',month).lt('report_date',next).order('report_date');
+    if(error)throw error;
+    for(const row of data||[])cacheCloudReport(row);
+    storeState();
+    if(request!==calendarRequest)return;
+    calendar();status.textContent=`${(data||[]).length} cloud report(s) this month. Tap a date to view it. Dots mark cloud or cached reports.`;
+  }catch(e){if(request===calendarRequest)status.textContent='Could not load cloud history. Cached reports are still available. Try Refresh reports.'}
+}
+function changeCalendarMonth(delta){calendarView=new Date(calendarView.getFullYear(),calendarView.getMonth()+delta,1);calendar();loadCalendarMonth()}
+function refreshCalendar(){loadCalendarMonth();if(selectedCalendarDate)selectDay(selectedCalendarDate)}
+async function selectDay(k){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
+  selectedCalendarDate=k;calendar();
+  displaySelectedDay(k,cloudReady?'Checking cloud…':'Sign in to check the cloud. Any report below is a local copy.');
+  if(!cloudReady)return;
+  try{
+    const {data,error}=await sb.from('daily_reports').select('*').eq('report_date',k).maybeSingle();
+    if(error)throw error;
+    if(data){cacheCloudReport(data);storeState();calendar();displaySelectedDay(k,pendingReports[k]?'Local changes are waiting to sync; the saved cloud report has been checked.':'Loaded from cloud.')}
+    else displaySelectedDay(k,state.saved[k]?'No cloud report was returned for this date. This local copy is still available.':'No cloud report was returned for this date. For evening reports saved with an older version, also check the following day.',!!state.saved[k]);
+  }catch(e){displaySelectedDay(k,'Could not check the cloud. Any report below is a cached copy; this does not mean the cloud report is missing.')}
+}
 function toast(t){let e=document.getElementById('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2200)}
 
 function autoSaveCurrentReport(){
@@ -258,8 +317,7 @@ function autoSaveCurrentReport(){
   state.daily.trackingNumbers=document.getElementById('trackingCountTop').value.trim();
   state.daily.employeesPresent=employees.filter(name=>!!state.employees[name]).length;
   state.daily.filledBy=document.getElementById('filledByTop').value.trim();
-  state.saved[state.date]={employees:state.employees,floaterName:state.floaterName||'',screeningCode:generateScreeningCode(),tracking:state.daily.trackingNumbers,employeesPresent:state.daily.employeesPresent,participants:state.daily.participants,nps:state.daily.nps,monthlyNps:state.daily.monthlyNps,pat:state.daily.pat,monthlyPat:state.daily.monthlyPat,upsell:state.daily.upsell,filledBy:state.daily.filledBy};
-  localStorage.setItem('eodState',JSON.stringify(state));
+  cacheCurrentReport();
   calendar();
   scheduleCloudSave();
 }
@@ -269,29 +327,108 @@ function autoSaveCurrentReport(){
 const SUPABASE_URL='https://kolziyigurwnbvpxqdgf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_iAoXi9ylbbcSLRiDAwYw8Q_Mfb1YK76';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
-let cloudReady=false, cloudTimer=null, realtimeChannel=null, applyingRemote=false;
-let localRevision=0, savedRevision=0, pendingRemoteRow=null;
+let cloudReady=false,cloudTimer=null,realtimeChannel=null,applyingRemote=false,activeSave=null,pendingRemoteRow=null;
+let pendingReports=readLocal('eodPendingReports',{}),queueRevision=Date.now();
 function blankToNull(v){return v===''||v===undefined?null:v}
-function cloudPayload(){
-  const d=state.daily||{};
-  return {report_date:state.date,participants:blankToNull(d.participants),daily_nps:blankToNull(d.nps),monthly_nps:blankToNull(d.monthlyNps),daily_pat:blankToNull(d.pat),monthly_pat:blankToNull(d.monthlyPat),upsell:blankToNull(d.upsell),screening_code:generateScreeningCode(),tracking_number:(d.trackingNumbers||'')||null,marina_present:!!state.employees.Marina,taylor_present:!!state.employees.Taylor,mia_present:!!state.employees.Mia,victor_present:!!state.employees.Victor,floater_present:!!state.employees.Floater,floater_name:state.floaterName||null,filled_by:d.filledBy||null};
+function cloudPayload(){return rowFromSnapshot(state.date,snapshotFromState(state))}
+function rowFromSnapshot(k,d){const e=d.employees||{};return {report_date:k,participants:blankToNull(d.participants),daily_nps:blankToNull(d.nps),monthly_nps:blankToNull(d.monthlyNps),daily_pat:blankToNull(d.pat),monthly_pat:blankToNull(d.monthlyPat),upsell:blankToNull(d.upsell),screening_code:d.screeningCode||codeForDate(k),tracking_number:d.tracking||null,marina_present:!!e.Marina,taylor_present:!!e.Taylor,mia_present:!!e.Mia,victor_present:!!e.Victor,floater_present:!!e.Floater,floater_name:d.floaterName||null,filled_by:d.filledBy||null}}
+function snapshotFromRow(r){const e={Marina:!!r.marina_present,Taylor:!!r.taylor_present,Mia:!!r.mia_present,Victor:!!r.victor_present,Floater:!!r.floater_present};return {employees:e,floaterName:r.floater_name||'',screeningCode:r.screening_code||codeForDate(r.report_date),tracking:r.tracking_number||'',employeesPresent:Object.values(e).filter(Boolean).length,participants:r.participants??'',nps:r.daily_nps??'',monthlyNps:r.monthly_nps??'',pat:r.daily_pat??'',monthlyPat:r.monthly_pat??'',upsell:r.upsell??'',filledBy:r.filled_by||''}}
+function cacheCloudReport(row){if(!row?.report_date)return;state.saved[row.report_date]=snapshotFromRow({...row,...(pendingReports[row.report_date]?.patch||{})})}
+let observedPayload=cloudPayload();
+function setSyncStatus(text){document.getElementById('syncStatus').textContent=text}
+function storePending(){try{localStorage.setItem('eodPendingReports',JSON.stringify(pendingReports))}catch(e){setSyncStatus('Device storage is full. Keep this tab open until cloud saving succeeds.')}}
+function scheduleCloudSave(){
+  if(applyingRemote)return;
+  const payload=cloudPayload(),patch={};
+  for(const key of Object.keys(payload))if(key!=='report_date'&&String(payload[key]??'')!==String(observedPayload[key]??''))patch[key]=payload[key];
+  observedPayload=payload;
+  if(Object.keys(patch).length){const old=pendingReports[state.date];pendingReports[state.date]={payload,patch:{...old?.patch,...patch},revision:++queueRevision};storePending()}
+  if(Object.keys(pendingReports).length){setSyncStatus('Saved on this device · waiting for cloud');schedulePendingSave()}
 }
-function scheduleCloudSave(){if(applyingRemote)return;localRevision++;if(!cloudReady)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(saveCloud,650)}
-async function saveCloud(){if(!cloudReady||applyingRemote)return;const revision=localRevision;const payload=cloudPayload();const {error}=await sb.from('daily_reports').upsert(payload,{onConflict:'report_date'});if(error){toast('Cloud save failed');return}savedRevision=Math.max(savedRevision,revision);if(localRevision>revision){schedulePendingSave();return}pendingRemoteRow=null}
 function schedulePendingSave(){if(!cloudReady)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(saveCloud,650)}
+async function saveCloud(){
+  if(!cloudReady||applyingRemote)return false;
+  if(activeSave)return activeSave;
+  if(!Object.keys(pendingReports).length)return true;
+  clearTimeout(cloudTimer);
+  activeSave=(async()=>{
+    let success=true;
+    for(const k of Object.keys(pendingReports)){
+      if(!cloudReady)break;
+      const queued=JSON.parse(JSON.stringify(pendingReports[k]));
+      setSyncStatus('Saving to cloud…');
+      try{
+        // A failed read must never become a blank overwrite. Only changed fields update an existing row.
+        const check=await sb.from('daily_reports').select('*').eq('report_date',k).maybeSingle();
+        if(check.error)throw check.error;
+        let result=check.data?await sb.from('daily_reports').update(queued.patch).eq('report_date',k).select('*').single():await sb.from('daily_reports').insert(queued.payload).select('*').single();
+        if(result.error?.code==='23505')result=await sb.from('daily_reports').update(queued.patch).eq('report_date',k).select('*').single();
+        if(result.error||result.data?.report_date!==k)throw result.error||new Error('Save was not confirmed');
+        if(pendingReports[k]?.revision===queued.revision)delete pendingReports[k];
+        storePending();cacheCloudReport(result.data);storeState();calendar();
+        if(k===state.date&&!pendingReports[k])receiveCloudRow(result.data);
+      }catch(e){success=false;setSyncStatus('Cloud save failed · report kept on this device. Tap Save now to retry.');break}
+    }
+    if(success)setSyncStatus(Object.keys(pendingReports).length?'Saved on this device · waiting for cloud':'All changes saved to cloud ✓');
+    return success;
+  })();
+  const success=await activeSave;activeSave=null;
+  if(success&&Object.keys(pendingReports).length)schedulePendingSave();
+  return success;
+}
 function reportMatchesLocal(r){const p=cloudPayload();return Object.keys(p).every(key=>String(p[key]??'')===String(r[key]??''))}
 function editingReport(){const el=document.activeElement;return !!(el&&document.querySelector('.app')?.contains(el)&&el.matches('input,select,textarea'))}
-function receiveCloudRow(r){if(!r||r.report_date!==state.date||reportMatchesLocal(r))return;if(editingReport()||localRevision>savedRevision){pendingRemoteRow=r;return}applyCloudRow(r)}
-document.addEventListener('focusout',()=>setTimeout(()=>{if(editingReport()||!pendingRemoteRow||localRevision>savedRevision)return;const row=pendingRemoteRow;pendingRemoteRow=null;if(!reportMatchesLocal(row))applyCloudRow(row)},0));
-function applyCloudRow(r){if(!r)return;applyingRemote=true;state.date=r.report_date;state.daily={participants:r.participants??'',nps:r.daily_nps??'',monthlyNps:r.monthly_nps??'',pat:r.daily_pat??'',monthlyPat:r.monthly_pat??'',upsell:r.upsell??'',trackingNumbers:r.tracking_number??'',employeesPresent:0,filledBy:r.filled_by??''};state.employees={Marina:!!r.marina_present,Taylor:!!r.taylor_present,Mia:!!r.mia_present,Victor:!!r.victor_present,Floater:!!r.floater_present};state.daily.employeesPresent=employees.filter(n=>!!state.employees[n]).length;state.floaterName=r.floater_name||'';const m=String(r.screening_code||'').match(/,([1-4])$/);state.codeSuffix=m?m[1]:'1';localStorage.setItem('eodState',JSON.stringify(state));render();calculateDailyPAT();applyingRemote=false;}
-async function loadCloudDay(){const {data,error}=await sb.from('daily_reports').select('*').eq('report_date',state.date).maybeSingle();if(error){toast('Could not load cloud report');return}if(data){applyCloudRow(data);savedRevision=localRevision}else await saveCloud();}
-function subscribeRealtime(){if(realtimeChannel)sb.removeChannel(realtimeChannel);realtimeChannel=sb.channel('daily-report-'+state.date).on('postgres_changes',{event:'*',schema:'public',table:'daily_reports',filter:'report_date=eq.'+state.date},payload=>{if(payload.new)receiveCloudRow(payload.new)}).subscribe();}
-async function enterApp(){cloudReady=true;await loadCloudDay();subscribeRealtime();document.getElementById('authOverlay').classList.add('auth-hidden')}
+function receiveCloudRow(r){
+  if(!r?.report_date)return;
+  cacheCloudReport(r);storeState();calendar();
+  if(r.report_date!==state.date)return;
+  if(reportMatchesLocal(r)){pendingRemoteRow=null;return}
+  if(editingReport()||pendingReports[state.date]){pendingRemoteRow=r;return}
+  applyCloudRow(r);
+}
+document.addEventListener('focusout',()=>setTimeout(async()=>{
+  if(editingReport()||!pendingRemoteRow||pendingReports[state.date]||!cloudReady)return;
+  pendingRemoteRow=null;
+  try{const {data,error}=await sb.from('daily_reports').select('*').eq('report_date',state.date).maybeSingle();if(error)throw error;if(data)receiveCloudRow(data)}catch(e){setSyncStatus('Could not refresh cloud changes. Your local report is kept.')}
+},0));
+function applyCloudRow(r){
+  if(!r||r.report_date!==state.date)return;
+  applyingRemote=true;
+  const merged={...r,...(pendingReports[state.date]?.patch||{})},x=snapshotFromRow(merged);
+  state.daily={participants:x.participants,nps:x.nps,monthlyNps:x.monthlyNps,pat:x.pat,monthlyPat:x.monthlyPat,upsell:x.upsell,trackingNumbers:x.tracking,employeesPresent:x.employeesPresent,filledBy:x.filledBy};
+  state.employees={...x.employees};state.floaterName=x.floaterName;
+  const m=String(x.screeningCode).match(/,([1-4])$/);state.codeSuffix=m?m[1]:'1';
+  cacheCurrentReport();render();calculateDailyPAT();observedPayload=cloudPayload();applyingRemote=false;
+}
+async function loadCloudDay(){
+  try{
+    const {data,error}=await sb.from('daily_reports').select('*').eq('report_date',state.date).maybeSingle();
+    if(error)throw error;
+    if(data){applyCloudRow(data);setSyncStatus(pendingReports[state.date]?'Local changes waiting to sync':'Loaded from cloud ✓')}
+    else if(pendingReports[state.date]){applyCloudRow(pendingReports[state.date].payload);setSyncStatus('Local report waiting to sync')}
+    else setSyncStatus('Changes save automatically when you enter them.');
+  }catch(e){setSyncStatus('Could not load the cloud report. Local data is kept; Save now will retry.')}
+}
+async function uploadLocalReport(k){
+  const cached=state.saved[k];if(!cloudReady||!cached)return;
+  const payload=rowFromSnapshot(k,cached);
+  try{
+    // Insert only: an existing cloud report must never be replaced by an older cached copy.
+    const {data,error}=await sb.from('daily_reports').insert(payload).select('*').single();
+    if(error){if(error.code==='23505'){await selectDay(k);return}throw error}
+    if(data?.report_date!==k)throw new Error('Save was not confirmed');
+    cacheCloudReport(data);storeState();calendar();displaySelectedDay(k,'Local copy saved to cloud ✓');
+  }catch(e){displaySelectedDay(k,'Could not upload. The local copy is still available; sign in and try again.',true)}
+}
+function subscribeRealtime(){if(realtimeChannel)sb.removeChannel(realtimeChannel);realtimeChannel=sb.channel('daily-report-history').on('postgres_changes',{event:'*',schema:'public',table:'daily_reports'},payload=>{if(payload.new?.report_date)receiveCloudRow(payload.new)}).subscribe()}
+async function enterApp(){cloudReady=true;await loadCloudDay();subscribeRealtime();document.getElementById('authOverlay').classList.add('auth-hidden');loadCalendarMonth();if(Object.keys(pendingReports).length)saveCloud()}
+window.addEventListener('online',()=>{if(cloudReady){saveCloud();loadCalendarMonth()}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&cloudReady)saveCloud()});
 async function checkSession(){const {data}=await sb.auth.getSession();if(data.session)enterApp();}
 document.getElementById('loginButton').addEventListener('click',async()=>{const btn=document.getElementById('loginButton'),err=document.getElementById('authError');err.textContent='';btn.disabled=true;btn.textContent='Signing in…';const email=document.getElementById('loginEmail').value.trim(),password=document.getElementById('loginPassword').value;const {error}=await sb.auth.signInWithPassword({email,password});btn.disabled=false;btn.textContent='Sign In';if(error){err.textContent=error.message;return}enterApp();});
 document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginButton').click()});
-document.getElementById('signOutButton').addEventListener('click',async()=>{cloudReady=false;if(realtimeChannel)await sb.removeChannel(realtimeChannel);await sb.auth.signOut();document.getElementById('loginPassword').value='';document.getElementById('authOverlay').classList.remove('auth-hidden');});
-sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||!session){cloudReady=false;document.getElementById('authOverlay').classList.remove('auth-hidden')}});
+document.getElementById('signOutButton').addEventListener('click',async()=>{await saveCloud();cloudReady=false;clearTimeout(cloudTimer);if(realtimeChannel)await sb.removeChannel(realtimeChannel);await sb.auth.signOut();document.getElementById('loginPassword').value='';document.getElementById('authOverlay').classList.remove('auth-hidden');});
+sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||!session){cloudReady=false;clearTimeout(cloudTimer);document.getElementById('authOverlay').classList.remove('auth-hidden')}});
 checkSession();
 
 render();calculateDailyPAT();
